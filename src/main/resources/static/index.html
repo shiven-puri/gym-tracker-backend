@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym Tracker Full CRUD Dashboard</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #38bdf8;
+            --danger: #f43f5e;
+            --warning: #f59e0b;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { color: var(--accent); margin-bottom: 25px; }
+
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1250px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        h2 {
+            font-size: 1.1rem;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 8px;
+            margin-top: 0;
+        }
+
+        form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+
+        input, select, button {
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: var(--text);
+            font-size: 0.88rem;
+        }
+
+        button {
+            background-color: var(--accent);
+            color: #0f172a;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.9; }
+
+        .btn-danger { background-color: var(--danger); color: white; }
+        .btn-warning { background-color: var(--warning); color: #0f172a; }
+
+        .data-list {
+            max-height: 220px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            flex-grow: 1;
+        }
+
+        .data-item {
+            padding: 10px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .actions { display: flex; gap: 5px; }
+        .actions button { padding: 4px 8px; font-size: 0.75rem; }
+        .inline-group { display: flex; gap: 8px; }
+        .inline-group input { flex: 1; }
+    </style>
+</head>
+<body>
+
+<h1>🏋️ Gym Tracker Dashboard (Full CRUD)</h1>
+
+<div class="container">
+
+    <!-- ==========================================
+         1. BODY METRICS CARD
+    =========================================== -->
+    <div class="card">
+        <h2>1. Body Metrics</h2>
+        <!-- CREATE -->
+        <form id="bodyForm">
+            <input type="number" step="0.1" id="weight" placeholder="Weight (kg)" required>
+            <input type="number" step="0.1" id="muscleMass" placeholder="Muscle Mass (kg)" required>
+            <input type="number" step="0.1" id="fatPercentage" placeholder="Fat Percentage (%)" required>
+            <button type="submit">POST: Log Body Metrics</button>
+        </form>
+
+        <h3>History (GET, PUT, DELETE)</h3>
+        <div id="bodyList" class="data-list">Loading metrics...</div>
+    </div>
+
+    <!-- ==========================================
+              2. EXERCISE CATALOG CARD
+         =========================================== -->
+    <div class="card">
+        <h2>2. Exercise Catalog</h2>
+        <!-- CREATE -->
+        <form id="exerciseForm">
+            <input type="text" id="exName" placeholder="Exercise Name (e.g. Bench Press)" required>
+            <input type="text" id="exGroup" placeholder="Muscle Group (e.g. Chest)" required>
+            <button type="submit">POST: Create Exercise</button>
+        </form>
+
+        <hr style="border-color: #334155; margin: 15px 0;">
+
+        <!-- DELETE EXERCISE BY DROPDOWN -->
+        <h3>Delete Exercise</h3>
+        <div class="inline-group">
+            <select id="deleteExIdSelect" style="flex: 1;"></select>
+            <button class="btn-danger" onclick="deleteExercise()">DELETE</button>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         3. WORKOUT LOGS CARD
+    =========================================== -->
+    <div class="card">
+        <h2>3. Workout Logs</h2>
+        <!-- CREATE LOG (USES DROPDOWN NOW) -->
+        <form id="workoutForm">
+            <label style="font-size: 0.8rem; color: var(--text-dim);">Select Exercise:</label>
+            <select id="exIdSelect" required></select>
+            <input type="number" step="0.5" id="weightLifted" placeholder="Weight Lifted (kg)" required>
+            <input type="number" id="reps" placeholder="Reps" required>
+            <input type="number" id="sets" placeholder="Sets" required>
+            <button type="submit">POST: Log Workout Set</button>
+        </form>
+
+        <hr style="border-color: #334155; margin: 15px 0;">
+
+        <!-- READ LOGS BY EXERCISE DROPDOWN -->
+        <h3>View Logs by Exercise</h3>
+        <div class="inline-group" style="margin-bottom: 10px;">
+            <select id="searchExIdSelect" style="flex: 1;"></select>
+            <button onclick="loadWorkoutHistory()">GET</button>
+        </div>
+        <div id="workoutList" class="data-list">Select an exercise to load history...</div>
+    </div>
+
+    <!-- ==========================================
+         4. CROWD LOGS CARD
+    =========================================== -->
+    <div class="card">
+        <h2>4. Crowd Traffic Logs</h2>
+        <!-- CREATE REPORT -->
+        <form id="crowdForm">
+            <select id="dayOfWeek">
+                <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+                <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+            </select>
+            <input type="text" id="timeSlot" placeholder="Time Slot (e.g. 18:00)" required>
+            <input type="number" min="1" max="5" id="crowdLevel" placeholder="Traffic Level (1-5)" required>
+            <button type="submit">POST: Report Traffic</button>
+        </form>
+
+        <hr style="border-color: #334155; margin: 15px 0;">
+
+        <!-- READ BY DAY / OPTIMAL SLOTS -->
+        <h3>Search Traffic & Smart Slots</h3>
+        <div class="inline-group" style="margin-bottom: 10px;">
+            <select id="searchDay">
+                <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+                <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+            </select>
+            <button onclick="loadCrowdStats()">GET Stats</button>
+            <button class="btn-warning" onclick="getOptimalSlots()">Smart Slots</button>
+        </div>
+        <div id="crowdList" class="data-list">Select day and click GET...</div>
+    </div>
+
+</div>
+
+<script>
+    const API_BASE = "http://localhost:8080/api";
+
+    // ==========================================
+    // 1. BODY METRICS CRUD
+    // ==========================================
+    async function loadBodyMetrics() {
+        const res = await fetch(`${API_BASE}/body-metrics/history`);
+        const data = await res.json();
+        const list = document.getElementById('bodyList');
+        list.innerHTML = data.reverse().map(item => `
+                <div class="data-item">
+                    <div>
+                        <strong>#${item.id}</strong> | ${item.logDate}<br>
+                        ${item.weight}kg | ${item.muscleMass}kg Mass | ${item.fatPercentage}% Fat
+                    </div>
+                    <div class="actions">
+                        <button class="btn-warning" onclick="updateBodyMetrics(${item.id})">PUT</button>
+                        <button class="btn-danger" onclick="deleteBodyMetrics(${item.id})">DEL</button>
+                    </div>
+                </div>
+            `).join('');
+    }
+
+    document.getElementById('bodyForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            weight: parseFloat(document.getElementById('weight').value),
+            muscleMass: parseFloat(document.getElementById('muscleMass').value),
+            fatPercentage: parseFloat(document.getElementById('fatPercentage').value)
+        };
+        await fetch(`${API_BASE}/body-metrics`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        e.target.reset();
+        loadBodyMetrics();
+    });
+
+    async function updateBodyMetrics(id) {
+        const newWeight = prompt("Enter new weight in kg:");
+        if (!newWeight) return;
+        await fetch(`${API_BASE}/body-metrics/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ weight: parseFloat(newWeight) })
+        });
+        loadBodyMetrics();
+    }
+
+    async function deleteBodyMetrics(id) {
+        if (!confirm(`Delete Body Metric #${id}?`)) return;
+        await fetch(`${API_BASE}/body-metrics/${id}`, { method: 'DELETE' });
+        loadBodyMetrics();
+    }
+
+    // ==========================================
+    // 2. EXERCISE CATALOG CRUD
+    // ==========================================
+    async function loadExerciseDropdowns() {
+        try {
+            const res = await fetch(`${API_BASE}/exercises`);
+            const exercises = await res.json();
+
+            const exSelect = document.getElementById('exIdSelect');
+            const searchSelect = document.getElementById('searchExIdSelect');
+            const deleteSelect = document.getElementById('deleteExIdSelect');
+
+            if (exercises.length === 0) {
+                const defaultOption = '<option value="">No exercises found. Add one first!</option>';
+                if (exSelect) exSelect.innerHTML = defaultOption;
+                if (searchSelect) searchSelect.innerHTML = defaultOption;
+                if (deleteSelect) deleteSelect.innerHTML = defaultOption;
+                return;
+            }
+
+            const optionsHTML = exercises.map(ex =>
+                `<option value="${ex.id}">[ID: ${ex.id}] ${ex.name} (${ex.muscleGroup})</option>`
+            ).join('');
+
+            if (exSelect) exSelect.innerHTML = optionsHTML;
+            if (searchSelect) searchSelect.innerHTML = optionsHTML;
+            if (deleteSelect) deleteSelect.innerHTML = optionsHTML;
+        } catch (err) {
+            console.error("Failed to load exercises for dropdowns:", err);
+        }
+    }
+
+    // --- EXERCISE CREATION ---
+    document.getElementById('exerciseForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            name: document.getElementById('exName').value,
+            muscleGroup: document.getElementById('exGroup').value
+        };
+        const res = await fetch(`${API_BASE}/exercises`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const saved = await res.json();
+        alert(`Exercise Created! ID: ${saved.id}`);
+        e.target.reset();
+        loadExerciseDropdowns(); // Refreshes dropdowns immediately!
+    });
+
+    // --- DELETE EXERCISE ---
+    async function deleteExercise() {
+        const selectEl = document.getElementById('deleteExIdSelect');
+        const id = selectEl ? selectEl.value : null;
+        if (!id) return;
+        if (!confirm(`Delete Exercise ID #${id} and associated logs?`)) return;
+        const res = await fetch(`${API_BASE}/exercises/${id}`, { method: 'DELETE' });
+        const text = await res.text();
+        alert(text);
+        loadExerciseDropdowns(); // Refreshes dropdowns immediately!
+    }
+
+    // ==========================================
+    // 3. WORKOUT LOGS CRUD
+    // ==========================================
+    document.getElementById('workoutForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            exercise: { id: parseInt(document.getElementById('exIdSelect').value) },
+            weightLifted: parseFloat(document.getElementById('weightLifted').value),
+            reps: parseInt(document.getElementById('reps').value),
+            sets: parseInt(document.getElementById('sets').value)
+        };
+        await fetch(`${API_BASE}/workouts/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        alert('Workout Logged!');
+        e.target.reset();
+    });
+
+    // --- FETCH WORKOUT HISTORY ---
+    async function loadWorkoutHistory() {
+        const id = document.getElementById('searchExIdSelect').value;
+        if (!id) return;
+        const res = await fetch(`${API_BASE}/workouts/progress/${id}`);
+        const data = await res.json();
+        const list = document.getElementById('workoutList');
+        if (data.length === 0) {
+            list.innerHTML = `<div class="data-item">No logs found for this exercise.</div>`;
+            return;
+        }
+        list.innerHTML = data.map(item => `
+                <div class="data-item">
+                    <div>
+                        <strong>#${item.id}</strong> | ${item.logDate}<br>
+                        ${item.weightLifted}kg x ${item.reps} reps (${item.sets} sets)
+                    </div>
+                    <div class="actions">
+                        <button class="btn-warning" onclick="updateWorkoutLog(${item.id})">PUT</button>
+                        <button class="btn-danger" onclick="deleteWorkoutLog(${item.id})">DEL</button>
+                    </div>
+                </div>
+            `).join('');
+    }
+
+    async function updateWorkoutLog(id) {
+        const newWeight = prompt("Enter updated weight lifted (kg):");
+        if (!newWeight) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/workouts/log/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ weightLifted: parseFloat(newWeight) })
+            });
+
+            if (res.ok) {
+                alert(`Workout Log #${id} updated!`);
+                loadWorkoutHistory(); // Refreshes the currently selected exercise log list!
+            } else {
+                alert("Failed to update workout log.");
+            }
+        } catch (err) {
+            console.error("Error updating workout log:", err);
+        }
+    }
+
+    // --- DELETE WORKOUT LOG ---
+    async function deleteWorkoutLog(id) {
+        if (!confirm(`Are you sure you want to delete Workout Log #${id}?`)) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/workouts/log/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                alert(`Workout Log #${id} deleted.`);
+                loadWorkoutHistory(); // Refreshes the log view immediately!
+            } else {
+                alert("Failed to delete workout log.");
+            }
+        } catch (err) {
+            console.error("Error deleting workout log:", err);
+        }
+    }
+
+    // ==========================================
+    // 4. CROWD LOGS CRUD
+    // ==========================================
+    document.getElementById('crowdForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            dayOfWeek: document.getElementById('dayOfWeek').value,
+            timeSlot: document.getElementById('timeSlot').value,
+            crowdLevel: parseInt(document.getElementById('crowdLevel').value)
+        };
+        await fetch(`${API_BASE}/crowd/report`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        alert('Traffic reported!');
+        e.target.reset();
+    });
+
+    async function loadCrowdStats() {
+        const day = document.getElementById('searchDay').value;
+        const res = await fetch(`${API_BASE}/crowd/stats/${day}`);
+        const data = await res.json();
+        const list = document.getElementById('crowdList');
+        if (data.length === 0) {
+            list.innerHTML = `<div class="data-item">No traffic logs for ${day}</div>`;
+            return;
+        }
+        list.innerHTML = data.map(item => `
+                <div class="data-item">
+                    <div>
+                        <strong>#${item.id}</strong> | ${item.timeSlot}<br>
+                        Traffic Level: ${item.crowdLevel} / 5
+                    </div>
+                    <div class="actions">
+                        <button class="btn-warning" onclick="updateCrowdReport(${item.id})">PUT</button>
+                        <button class="btn-danger" onclick="deleteCrowdReport(${item.id})">DEL</button>
+                    </div>
+                </div>
+            `).join('');
+    }
+
+    async function updateCrowdReport(id) {
+        const newLevel = prompt("Enter updated traffic level (1-5):");
+        if (!newLevel) return;
+        await fetch(`${API_BASE}/crowd/report/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ crowdLevel: parseInt(newLevel) })
+        });
+        loadCrowdStats();
+    }
+
+    async function deleteCrowdReport(id) {
+        if (!confirm(`Delete Crowd Log #${id}?`)) return;
+        await fetch(`${API_BASE}/crowd/report/${id}`, { method: 'DELETE' });
+        loadCrowdStats();
+    }
+
+    async function getOptimalSlots() {
+        const day = document.getElementById('searchDay').value;
+        const res = await fetch(`${API_BASE}/analytics/optimal-slots/${day}`);
+        const data = await res.json();
+        const list = document.getElementById('crowdList');
+        if (data.length === 0) {
+            list.innerHTML = `<div class="data-item">No slot analytics available for ${day}</div>`;
+            return;
+        }
+        list.innerHTML = data.map(slot => `
+                <div class="data-item">
+                    <span>⏰ ${slot.timeSlot}</span>
+                    <span>Avg Traffic: ${slot.averageCrowdLevel.toFixed(1)} / 5</span>
+                </div>
+            `).join('');
+    }
+
+
+    // Call this on page startup
+    loadExerciseDropdowns();
+
+    // Initial Load
+    loadBodyMetrics();
+</script>
+</body>
+</html>

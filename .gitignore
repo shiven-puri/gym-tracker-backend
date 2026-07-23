@@ -1,0 +1,18 @@
+# Target directory containing compiled JARs and build artifacts
+/target/
+*.jar
+*.war
+
+# IntelliJ IDEA settings
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# System / OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
