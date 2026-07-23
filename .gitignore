@@ -16,3 +16,26 @@ Thumbs.db
 
 # Logs
 *.log
+# Maven Wrapper
+!.mvn/wrapper/maven-wrapper.jar
+
+# Maven timing file
+.mvn/timing.properties
+
+# Environment variables
+.env
+.env.*
+
+# VS Code (if you ever open the project there)
+.vscode/
+
+# Eclipse / STS
+.project
+.classpath
+.settings/
+.factorypath
+.springBeans
+.sts4-cache/
+
+# Temporary files
+*.tmp
