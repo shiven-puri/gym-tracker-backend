@@ -24,7 +24,7 @@ Thumbs.db
 
 # Environment variables
 .env
-.env.*
+
 
 # VS Code (if you ever open the project there)
 .vscode/
