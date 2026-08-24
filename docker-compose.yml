@@ -11,6 +11,8 @@ services:
       - "1522:1521"
     environment:
       - ORACLE_PWD=${ORACLE_PWD}
+    volumes:
+      - oracle-data:/opt/oracle/oradata
     restart: always
 
   # ==========================================
@@ -28,4 +30,6 @@ services:
     depends_on:
       - oracle-db
     restart: always
+volumes:
+  oracle-data:
     
