@@ -29,8 +29,14 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
+# Create a non-root user
+RUN addgroup -S spring && adduser -S spring -G spring
+
 # Copy the JAR from the build stage
 COPY --from=build /app/target/*.jar app.jar
+
+# Run as non-root user
+USER spring:spring
 
 EXPOSE 8080
 
