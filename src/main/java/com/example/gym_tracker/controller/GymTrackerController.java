@@ -2,154 +2,258 @@ package com.example.gym_tracker.controller;
 
 import com.example.gym_tracker.dto.SlotSuggestionDTO;
 import com.example.gym_tracker.model.BodyMetrics;
+import com.example.gym_tracker.model.CrowdLog;
 import com.example.gym_tracker.model.Exercise;
 import com.example.gym_tracker.model.WorkoutLog;
-import com.example.gym_tracker.model.CrowdLog;
-import com.example.gym_tracker.repository.BodyMetricsRepository;
-import com.example.gym_tracker.repository.ExerciseRepository;
-import com.example.gym_tracker.repository.WorkoutLogRepository;
-import com.example.gym_tracker.repository.CrowdLogRepository;
+import com.example.gym_tracker.service.BodyMetricsService;
+import com.example.gym_tracker.service.CrowdLogService;
+import com.example.gym_tracker.service.ExerciseService;
+import com.example.gym_tracker.service.WorkoutLogService;
+import jakarta.validation.Valid;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 
 import java.util.List;
+
+@Tag(
+        name = "Gym Tracker API",
+        description = "APIs for workout tracking, body metrics, exercises, and gym crowd analytics"
+)
 
 @RestController
 @RequestMapping("/api")
 public class GymTrackerController {
 
-    @Autowired
-    private BodyMetricsRepository bodyMetricsRepository;
+    private final BodyMetricsService bodyMetricsService;
+    private final ExerciseService exerciseService;
+    private final WorkoutLogService workoutLogService;
+    private final CrowdLogService crowdLogService;
 
-    @Autowired
-    private ExerciseRepository exerciseRepository;
-
-    @Autowired
-    private WorkoutLogRepository workoutLogRepository;
-
-    @Autowired
-    private CrowdLogRepository crowdLogRepository;
-
-
-    @PostMapping("/body-metrics")
-    public BodyMetrics logBodyMetrics(@RequestBody BodyMetrics metrics) {
-        return bodyMetricsRepository.save(metrics);
+    public GymTrackerController(
+            BodyMetricsService bodyMetricsService,
+            ExerciseService exerciseService,
+            WorkoutLogService workoutLogService,
+            CrowdLogService crowdLogService
+    ) {
+        this.bodyMetricsService = bodyMetricsService;
+        this.exerciseService = exerciseService;
+        this.workoutLogService = workoutLogService;
+        this.crowdLogService = crowdLogService;
     }
 
+
+    // -------------------------------
+    // Body Metrics
+    // -------------------------------
+
+
+    @Operation(
+            summary = "Create body metrics",
+            description = "Records the user's weight, muscle mass, and body fat percentage."
+    )
+    @PostMapping("/body-metrics")
+    public BodyMetrics logBodyMetrics(
+            @Valid@RequestBody BodyMetrics metrics
+    ) {
+        return bodyMetricsService.logBodyMetrics(metrics);
+    }
+
+    @Operation(
+            summary = "Get body metrics history",
+            description = "Returns the user's previously recorded body metrics."
+    )
     @GetMapping("/body-metrics/history")
     public List<BodyMetrics> getBodyMetricsHistory() {
-        return bodyMetricsRepository.findAll();
+        return bodyMetricsService.getBodyMetricsHistory();
     }
 
+    @Operation(
+            summary = "Delete body metrics",
+            description = "Deletes a body metrics record by its ID."
+    )
     @DeleteMapping("/body-metrics/{id}")
-    public String deleteBodyMetrics(@PathVariable Long id) {
-        if (bodyMetricsRepository.existsById(id)) {
-            bodyMetricsRepository.deleteById(id);
-            return "Body metric entry with ID " + id + " was successfully deleted.";
-        }
-        return "Entry not found with ID " + id;
+    public String deleteBodyMetrics(
+            @PathVariable Long id
+    ) {
+        bodyMetricsService.deleteBodyMetrics(id);
+        return "Body metric entry with ID " + id
+                + " was successfully deleted.";
     }
 
     @PutMapping("/body-metrics/{id}")
-    public BodyMetrics updateBodyMetrics(@PathVariable Long id, @RequestBody BodyMetrics updatedMetrics) {
-        return bodyMetricsRepository.findById(id).map(existing -> {
-            if (updatedMetrics.getWeight() != null) existing.setWeight(updatedMetrics.getWeight());
-            if (updatedMetrics.getMuscleMass() != null) existing.setMuscleMass(updatedMetrics.getMuscleMass());
-            if (updatedMetrics.getFatPercentage() != null) existing.setFatPercentage(updatedMetrics.getFatPercentage());
-            return bodyMetricsRepository.save(existing);
-        }).orElseThrow(() -> new RuntimeException("Body metric entry not found with ID " + id));
+    public BodyMetrics updateBodyMetrics(
+            @PathVariable Long id,
+            @Valid@RequestBody BodyMetrics updatedMetrics
+    ) {
+        return bodyMetricsService.updateBodyMetrics(
+                id,
+                updatedMetrics
+        );
     }
 
 
+    // -------------------------------
+    // Exercises
+    // -------------------------------
 
+    @Operation(
+            summary = "Create exercise",
+            description = "Creates a new exercise with its name and muscle group."
+    )
     @PostMapping("/exercises")
-    public Exercise createExercise(@RequestBody Exercise exercise) {
-        return exerciseRepository.save(exercise);
+    public Exercise createExercise(
+            @Valid@RequestBody Exercise exercise
+    ) {
+        return exerciseService.createExercise(exercise);
     }
 
-    @PostMapping("/workouts/log")
-    public WorkoutLog logWorkout(@RequestBody WorkoutLog log) {
-        // This expects the incoming JSON to include an existing exercise ID link
-        return workoutLogRepository.save(log);
-    }
-
-    @GetMapping("/workouts/progress/{exerciseId}")
-    public List<WorkoutLog> getExerciseProgress(@PathVariable Long exerciseId) {
-        return workoutLogRepository.findByExerciseIdOrderByLogDateAsc(exerciseId);
-    }
+    @Operation(
+            summary = "Get all exercises",
+            description = "Returns all exercises available in the system."
+    )
     @GetMapping("/exercises")
     public List<Exercise> getAllExercises() {
-        return exerciseRepository.findAll();
+        return exerciseService.getAllExercises();
     }
 
-    @DeleteMapping("/workouts/log/{id}")
-    public String deleteWorkoutLog(@PathVariable Long id) {
-        if (workoutLogRepository.existsById(id)) {
-            workoutLogRepository.deleteById(id);
-            return "Workout log with ID " + id + " was successfully deleted.";
-        }
-        return "Workout log not found with ID " + id;
-    }
-
-    @PutMapping("/workouts/log/{id}")
-    public WorkoutLog updateWorkoutLog(@PathVariable Long id, @RequestBody WorkoutLog updatedLog) {
-        return workoutLogRepository.findById(id).map(existing -> {
-            if (updatedLog.getWeightLifted() != null) existing.setWeightLifted(updatedLog.getWeightLifted());
-            if (updatedLog.getReps() != null) existing.setReps(updatedLog.getReps());
-            if (updatedLog.getSets() != null) existing.setSets(updatedLog.getSets());
-            return workoutLogRepository.save(existing);
-        }).orElseThrow(() -> new RuntimeException("Workout log not found with ID " + id));
-    }
-
-
+    @Operation(
+            summary = "Delete exercise",
+            description = "Deletes an exercise by its ID."
+    )
     @DeleteMapping("/exercises/{id}")
-    public String deleteExercise(@PathVariable Long id) {
-        if (exerciseRepository.existsById(id)) {
-            exerciseRepository.deleteById(id);
-            return "Exercise with ID " + id + " and all associated logs were deleted.";
-        }
-        return "Exercise not found with ID " + id;
+    public String deleteExercise(
+            @PathVariable Long id
+    ) {
+        exerciseService.deleteExercise(id);
+        return "Exercise with ID " + id
+                + " and all its related logs deleted successfully.";
     }
 
 
+    // -------------------------------
+    // Workouts
+    // -------------------------------
+
+    @Operation(
+            summary = "Log a workout",
+            description = "Records a workout for an exercise, including weight lifted, repetitions, and sets."
+    )
+    @PostMapping("/workouts/log")
+    public WorkoutLog logWorkout(
+            @Valid@RequestBody WorkoutLog log
+    ) {
+        return workoutLogService.logWorkout(log);
+    }
+
+    @Operation(
+            summary = "Get workout progress",
+            description = "Returns the workout progress history for a specific exercise."
+    )
+    @GetMapping("/workouts/progress/{exerciseId}")
+    public List<WorkoutLog> getExerciseProgress(
+            @PathVariable Long exerciseId
+    ) {
+        return workoutLogService.getExerciseProgress(exerciseId);
+    }
+
+    @Operation(
+            summary = "Delete workout log",
+            description = "Deletes a workout log by its ID."
+    )
+    @DeleteMapping("/workouts/log/{id}")
+    public String deleteWorkoutLog(
+            @PathVariable Long id
+    ) {
+        workoutLogService.deleteWorkoutLog(id);
+        return "Workout log with ID " + id
+                + " was successfully deleted.";
+    }
+
+    @Operation(
+            summary = "Update workout log",
+            description = "Updates an existing workout log by its ID."
+    )
+    @PutMapping("/workouts/log/{id}")
+    public WorkoutLog updateWorkoutLog(
+            @PathVariable Long id,
+            @Valid@RequestBody WorkoutLog updatedLog
+    ) {
+        return workoutLogService.updateWorkoutLog(
+                id,
+                updatedLog
+        );
+    }
+
+
+    // -------------------------------
+    // Crowd
+    // -------------------------------
+
+    @Operation(
+            summary = "Report gym crowd level",
+            description = "Records the crowd level for a specific day and time slot."
+    )
     @PostMapping("/crowd/report")
-    public CrowdLog reportCrowd(@RequestBody CrowdLog log) {
-        return crowdLogRepository.save(log);
+    public CrowdLog reportCrowd(
+            @Valid@RequestBody CrowdLog log
+    ) {
+        return crowdLogService.reportCrowd(log);
     }
 
+    @Operation(
+            summary = "Get crowd statistics",
+            description = "Returns crowd statistics for a specific day of the week."
+    )
     @GetMapping("/crowd/stats/{day}")
-    public List<CrowdLog> getCrowdStatsByDay(@PathVariable String day) {
-        return crowdLogRepository.findByDayOfWeek(day);
+    public List<CrowdLog> getCrowdStatsByDay(
+            @PathVariable String day
+    ) {
+        return crowdLogService.getCrowdStatsByDay(day);
     }
 
+    @Operation(
+            summary = "Delete crowd report",
+            description = "Deletes a crowd report by its ID."
+    )
     @DeleteMapping("/crowd/report/{id}")
-    public String deleteCrowdReport(@PathVariable Long id) {
-        if (crowdLogRepository.existsById(id)) {
-            crowdLogRepository.deleteById(id);
-            return "Crowd report with ID " + id + " was successfully deleted.";
-        }
-        return "Crowd report not found with ID " + id;
+    public String deleteCrowdReport(
+            @PathVariable Long id
+    ) {
+        crowdLogService.deleteCrowdReport(id);
+        return "Crowd report with ID " + id
+                + " was successfully deleted.";
     }
 
+    @Operation(
+            summary = "Update crowd report",
+            description = "Updates an existing crowd report by its ID."
+    )
     @PutMapping("/crowd/report/{id}")
-    public CrowdLog updateCrowdReport(@PathVariable Long id, @RequestBody CrowdLog updatedReport) {
-        return crowdLogRepository.findById(id).map(existing -> {
-            if (updatedReport.getCrowdLevel() != null) existing.setCrowdLevel(updatedReport.getCrowdLevel());
-            if (updatedReport.getTimeSlot() != null) existing.setTimeSlot(updatedReport.getTimeSlot());
-            if (updatedReport.getDayOfWeek() != null) existing.setDayOfWeek(updatedReport.getDayOfWeek());
-            return crowdLogRepository.save(existing);
-        }).orElseThrow(() -> new RuntimeException("Crowd log not found with ID " + id));
+    public CrowdLog updateCrowdReport(
+            @PathVariable Long id,
+            @Valid@RequestBody CrowdLog updatedReport
+    ) {
+        return crowdLogService.updateCrowdReport(
+                id,
+                updatedReport
+        );
     }
 
+
+    // -------------------------------
+    // Analytics
+    // -------------------------------
+
+    @Operation(
+            summary = "Get optimal gym time slots",
+            description = "Returns gym time slots ordered by average crowd level for a specific day."
+    )
     @GetMapping("/analytics/optimal-slots/{day}")
-    public List<SlotSuggestionDTO> getOptimalTimeSlots(@PathVariable String day) {
-        List<Object[]> rawResults = crowdLogRepository.findOptimalTimeSlots(day);
-        return rawResults.stream()
-                .map(result -> new SlotSuggestionDTO((String) result[0], (Double) result[1]))
-                .toList();
+    public List<SlotSuggestionDTO> getOptimalTimeSlots(
+            @PathVariable String day
+    ) {
+        return crowdLogService.getOptimalTimeSlots(day);
     }
-
-
-
 }

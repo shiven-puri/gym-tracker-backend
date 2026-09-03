@@ -9,34 +9,38 @@ The application is containerized with Docker, tested through GitHub Actions, and
 ## ✨ Features
 
 - 🏋️ **Exercise Management**
-    - Create exercises
-    - View all exercises
-    - Delete exercises
+  - Create exercises
+  - View all exercises
+  - Delete exercises
+  - Automatically delete associated workout logs when an exercise is deleted
 
 - 💪 **Workout Tracking**
-    - Log workout sessions
-    - Track weight, reps, and sets
-    - View exercise progress over time
-    - Update and delete workout logs
+  - Log workout sessions
+  - Track weight, reps, and sets
+  - View exercise progress over time
+  - Update and delete workout logs
 
 - 📏 **Body Metrics**
-    - Record weight
-    - Record muscle mass
-    - Record body fat percentage
-    - View body metric history
-    - Update and delete measurements
+  - Record weight
+  - Record muscle mass
+  - Record body fat percentage
+  - View body metric history
+  - Update and delete measurements
 
 - 👥 **Gym Crowd Tracking**
-    - Report gym crowd levels
-    - View crowd statistics by day
-    - Update and delete crowd reports
+  - Report gym crowd levels
+  - View crowd statistics by day
+  - Update and delete crowd reports
 
 - 📊 **Crowd Analytics**
-    - Analyze historical crowd data
-    - Get optimal gym time-slot recommendations for a given day
+  - Analyze historical crowd data
+  - Get optimal gym time-slot recommendations for a given day
 
 - 📖 **API Documentation**
-    - Interactive Swagger / OpenAPI documentation
+  - Interactive Swagger / OpenAPI documentation
+
+- 🧪 **Automated Testing**
+  - 24 automated tests covering CRUD operations, validation, error handling, analytics, and entity relationships
 
 ---
 
@@ -49,6 +53,7 @@ The application is containerized with Docker, tested through GitHub Actions, and
 - **Spring Web**
 - **Spring Data JPA**
 - **Hibernate**
+- **Jakarta Bean Validation**
 - **Maven**
 - **Lombok**
 - **Swagger / OpenAPI**
@@ -78,10 +83,36 @@ The application uses environment variables for database configuration, allowing 
 
 The application follows a layered Spring Boot architecture:
 
-- **Controller** — exposes REST API endpoints
+```text
+                    REST API
+                       │
+                       ▼
+                 ┌───────────┐
+                 │ Controller│
+                 └─────┬─────┘
+                       │
+                       ▼
+                 ┌───────────┐
+                 │  Service  │
+                 └─────┬─────┘
+                       │
+                       ▼
+                 ┌───────────┐
+                 │ Repository│
+                 └─────┬─────┘
+                       │
+                       ▼
+                  ┌─────────┐
+                  │Database │
+                  └─────────┘
+```
+
+- **Controller** — exposes REST API endpoints and handles HTTP requests
+- **Service** — contains application and business logic
 - **Repository** — handles database access through Spring Data JPA
-- **Model** — represents application entities
-- **DTO** — transfers data for analytics responses
+- **Model** — represents persisted application entities
+- **DTO** — used for specialized API responses such as crowd analytics
+- **Global Exception Handler** — provides consistent error responses for validation failures and missing resources
 - **Static Frontend** — provides the web UI served by Spring Boot
 
 ---
@@ -195,6 +226,16 @@ http://localhost:8080
 
 The project uses **H2** for automated tests so that CI does not need to start the heavier Oracle database container.
 
+The test suite currently contains **24 automated tests** covering:
+
+- CRUD operations
+- Bean validation
+- Error handling
+- Missing-resource scenarios
+- Workout progress
+- Crowd analytics
+- Exercise and workout-log relationships
+
 Run the test suite:
 
 ```bash
@@ -207,13 +248,7 @@ Windows:
 .\mvnw.cmd clean verify
 ```
 
-The GitHub Actions workflow automatically:
-
-1. Sets up Java 21
-2. Restores Maven dependencies
-3. Runs the Maven test/build process
-4. Builds the Docker image
-5. Publishes the image to GHCR on pushes to `main`
+GitHub Actions automatically runs the build and test suite on pushes and pull requests targeting `main`.
 
 ---
 
@@ -296,7 +331,7 @@ All REST endpoints use the `/api` base path.
 |---|---|---|
 | POST | `/api/exercises` | Create an exercise |
 | GET | `/api/exercises` | Get all exercises |
-| DELETE | `/api/exercises/{id}` | Delete an exercise |
+| DELETE | `/api/exercises/{id}` | Delete an exercise and its associated workout logs |
 
 ---
 
@@ -338,7 +373,7 @@ The production application is deployed using:
 - **Azure Database for PostgreSQL** — persistent database
 - **GitHub Container Registry** — Docker image registry
 
-The production database is configured separately from the local Oracle database using environment variables.
+The production database is configured separately from the local Oracle database using environment variables:
 
 ```text
 DB_URL
@@ -357,7 +392,7 @@ Minimum replicas: 0
 Maximum replicas: 1
 ```
 
-The application can therefore scale down when it is not being used while remaining available through its public HTTPS endpoint.
+The application can scale down when it is not being used while remaining available through its public HTTPS endpoint.
 
 ---
 
@@ -394,6 +429,8 @@ latest
 ```
 
 The commit SHA tag provides an immutable reference to a specific build and can be used for reproducible deployments and rollbacks.
+
+> Azure Container Apps deployment is currently performed separately from the GitHub Actions image publishing workflow.
 
 ---
 
@@ -437,17 +474,16 @@ Local Development
        ▼
 Oracle Database
        │
-       │
-       ├───────────────┐
-       │               │
-       ▼               ▼
-   Application       Docker
-                       
+       ▼
+Spring Boot Application
+
+
 CI / Automated Tests
        │
        ▼
       H2
-       
+
+
 Production
        │
        ▼
@@ -468,10 +504,11 @@ Potential future improvements include:
 - User accounts
 - Role-based authorization
 - Pagination and filtering
-- More comprehensive unit and integration tests
 - Automated deployment from GitHub Actions to Azure
 - Improved analytics and visualizations
 - More advanced workout progress tracking
+- Database migration management with Flyway
+- Expanded API DTOs as the application grows
 
 ---
 
