@@ -30,6 +30,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.example.gym_tracker.model.User;
+import com.example.gym_tracker.repository.UserRepository;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+
+import java.util.UUID;
+
+import com.example.gym_tracker.service.AuthService;
+import org.springframework.http.HttpHeaders;
+import com.example.gym_tracker.dto.AuthResponse;
+import com.example.gym_tracker.model.Role;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -52,6 +65,19 @@ class GymTrackerApplicationTests {
     @Autowired
     private CrowdLogRepository crowdLogRepository;
 
+    @Autowired
+    private AuthService authService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    private String userToken;
+    private String adminToken;
+    private Long testUserId;
+
 
     @BeforeEach
     void cleanDatabase() {
@@ -59,6 +85,43 @@ class GymTrackerApplicationTests {
         bodyMetricsRepository.deleteAll();
         crowdLogRepository.deleteAll();
         exerciseRepository.deleteAll();
+        userRepository.deleteAll();
+
+        String email = "test-" + UUID.randomUUID() + "@example.com";
+        String password = "TestPassword123!";
+
+        AuthResponse registered = authService.register(email, password);
+
+        userToken = registered.token();
+        testUserId = registered.userId();
+
+        String adminEmail = "admin-" + UUID.randomUUID() + "@example.com";
+        String adminPassword = "AdminPassword123!";
+
+        User admin = new User(
+                adminEmail,
+                passwordEncoder.encode(adminPassword)
+        );
+        admin.setRole(Role.ADMIN);
+        userRepository.save(admin);
+
+        adminToken = authService.login(adminEmail, adminPassword).token();
+    }
+
+    private MockHttpServletRequestBuilder withUserToken(
+            MockHttpServletRequestBuilder request) {
+        return request.header(
+                HttpHeaders.AUTHORIZATION,
+                "Bearer " + userToken
+        );
+    }
+
+    private MockHttpServletRequestBuilder withAdminToken(
+            MockHttpServletRequestBuilder request) {
+        return request.header(
+                HttpHeaders.AUTHORIZATION,
+                "Bearer " + adminToken
+        );
     }
 
 
@@ -75,6 +138,7 @@ class GymTrackerApplicationTests {
     // Exercise tests
     // --------------------------------------------------
 
+
     @Test
     void shouldCreateAndGetExercise() throws Exception {
 
@@ -82,19 +146,22 @@ class GymTrackerApplicationTests {
         exercise.setName("Bench Press");
         exercise.setMuscleGroup("Chest");
 
-        mockMvc.perform(post("/api/exercises")
+        // Creating an exercise requires authentication.
+        mockMvc.perform(withUserToken(post("/api/exercises")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(exercise)))
+                        .content(objectMapper.writeValueAsString(exercise))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Bench Press"))
                 .andExpect(jsonPath("$.muscleGroup").value("Chest"))
                 .andExpect(jsonPath("$.id").exists());
 
+        // The exercise catalogue is public, so no token is needed here.
         mockMvc.perform(get("/api/exercises"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("Bench Press"))
                 .andExpect(jsonPath("$[0].muscleGroup").value("Chest"));
     }
+
 
 
     // --------------------------------------------------
@@ -110,10 +177,10 @@ class GymTrackerApplicationTests {
         metrics.setMuscleMass(32.0);
         metrics.setFatPercentage(18.0);
 
-        String response = mockMvc.perform(
+        String response = mockMvc.perform(withUserToken(
                         post("/api/body-metrics")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(metrics))
+                                .content(objectMapper.writeValueAsString(metrics)))
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.weight").value(75.0))
@@ -128,7 +195,7 @@ class GymTrackerApplicationTests {
                 objectMapper.readValue(response, BodyMetrics.class);
 
         // Get history
-        mockMvc.perform(get("/api/body-metrics/history"))
+        mockMvc.perform(withUserToken( get("/api/body-metrics/history")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].weight").value(75.0))
                 .andExpect(jsonPath("$[0].muscleMass").value(32.0))
@@ -138,24 +205,24 @@ class GymTrackerApplicationTests {
         BodyMetrics update = new BodyMetrics();
         update.setWeight(73.5);
 
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         put("/api/body-metrics/" + saved.getId())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(update))
-                )
+                ))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.weight").value(73.5))
                 .andExpect(jsonPath("$.muscleMass").value(32.0))
                 .andExpect(jsonPath("$.fatPercentage").value(18.0));
 
         // Delete
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         delete("/api/body-metrics/" + saved.getId())
-                )
+                ))
                 .andExpect(status().isOk());
 
         // Verify deletion
-        mockMvc.perform(get("/api/body-metrics/history"))
+        mockMvc.perform(withUserToken(get("/api/body-metrics/history")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }
@@ -184,11 +251,11 @@ class GymTrackerApplicationTests {
         workout.setReps(8);
         workout.setSets(3);
 
-        String response = mockMvc.perform(
+        String response = mockMvc.perform(withUserToken(
                         post("/api/workouts/log")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(workout))
-                )
+                ))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.weightLifted").value(100.0))
                 .andExpect(jsonPath("$.reps").value(8))
@@ -202,10 +269,10 @@ class GymTrackerApplicationTests {
                 objectMapper.readValue(response, WorkoutLog.class);
 
         // Get exercise progress
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         get("/api/workouts/progress/"
                                 + savedExercise.getId())
-                )
+                ))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].weightLifted").value(100.0))
                 .andExpect(jsonPath("$[0].reps").value(8))
@@ -218,29 +285,29 @@ class GymTrackerApplicationTests {
         update.setReps(6);
         update.setSets(3);
 
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         put("/api/workouts/log/"
                                 + savedWorkout.getId())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(update))
-                )
+                ))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.weightLifted").value(105.0))
                 .andExpect(jsonPath("$.reps").value(6))
                 .andExpect(jsonPath("$.sets").value(3));
 
         // Delete workout
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         delete("/api/workouts/log/"
                                 + savedWorkout.getId())
-                )
+                ))
                 .andExpect(status().isOk());
 
         // Verify deletion
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         get("/api/workouts/progress/"
                                 + savedExercise.getId())
-                )
+                ))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }
@@ -259,11 +326,11 @@ class GymTrackerApplicationTests {
         crowdLog.setTimeSlot("18:00-19:00");
         crowdLog.setCrowdLevel(8);
 
-        String response = mockMvc.perform(
+        String response = mockMvc.perform(withUserToken(
                         post("/api/crowd/report")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(crowdLog))
-                )
+                ))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.dayOfWeek").value("Monday"))
                 .andExpect(jsonPath("$.timeSlot").value("18:00-19:00"))
@@ -292,20 +359,20 @@ class GymTrackerApplicationTests {
         update.setTimeSlot("17:00-18:00");
         update.setDayOfWeek("Monday");
 
-        mockMvc.perform(
+        mockMvc.perform(withAdminToken(
                         put("/api/crowd/report/" + saved.getId())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(update))
-                )
+                ))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.crowdLevel").value(5))
                 .andExpect(jsonPath("$.timeSlot")
                         .value("17:00-18:00"));
 
         // Delete report
-        mockMvc.perform(
+        mockMvc.perform(withAdminToken(
                         delete("/api/crowd/report/" + saved.getId())
-                )
+                ))
                 .andExpect(status().isOk());
 
         // Verify deletion
@@ -352,9 +419,9 @@ class GymTrackerApplicationTests {
     @Test
     void shouldReturn404WhenDeletingNonexistentExercise() throws Exception {
 
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         delete("/api/exercises/99999")
-                )
+                ))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message")
@@ -365,9 +432,9 @@ class GymTrackerApplicationTests {
     @Test
     void shouldReturn404WhenDeletingNonexistentBodyMetrics() throws Exception {
 
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         delete("/api/body-metrics/99999")
-                )
+                ))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message")
@@ -378,9 +445,9 @@ class GymTrackerApplicationTests {
     @Test
     void shouldReturn404WhenDeletingNonexistentWorkout() throws Exception {
 
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         delete("/api/workouts/log/99999")
-                )
+                ))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message")
@@ -391,9 +458,9 @@ class GymTrackerApplicationTests {
     @Test
     void shouldReturn404WhenDeletingNonexistentCrowdReport() throws Exception {
 
-        mockMvc.perform(
+        mockMvc.perform(withAdminToken(
                         delete("/api/crowd/report/99999")
-                )
+                ))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message")
@@ -407,11 +474,11 @@ class GymTrackerApplicationTests {
         BodyMetrics update = new BodyMetrics();
         update.setWeight(70.0);
 
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         put("/api/body-metrics/99999")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(update))
-                )
+                ))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message")
@@ -427,11 +494,11 @@ class GymTrackerApplicationTests {
         update.setReps(8);
         update.setSets(3);
 
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         put("/api/workouts/log/99999")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(update))
-                )
+                ))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message")
@@ -447,11 +514,11 @@ class GymTrackerApplicationTests {
         update.setTimeSlot("17:00-18:00");
         update.setDayOfWeek("Monday");
 
-        mockMvc.perform(
+        mockMvc.perform(withAdminToken(
                         put("/api/crowd/report/99999")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(update))
-                )
+                ))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message")
@@ -465,11 +532,11 @@ class GymTrackerApplicationTests {
         Exercise exercise = new Exercise();
         exercise.setMuscleGroup("Chest");
 
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         post("/api/exercises")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(exercise))
-                )
+                ))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message")
@@ -484,11 +551,11 @@ class GymTrackerApplicationTests {
         Exercise exercise = new Exercise();
         exercise.setName("Bench Press");
 
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                         post("/api/exercises")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(exercise))
-                )
+                ))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message")
@@ -504,9 +571,9 @@ class GymTrackerApplicationTests {
         bodyMetrics.setMuscleMass(30.0);
         bodyMetrics.setFatPercentage(20.0);
 
-        mockMvc.perform(post("/api/body-metrics")
+        mockMvc.perform(withUserToken(post("/api/body-metrics")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(bodyMetrics)))
+                        .content(objectMapper.writeValueAsString(bodyMetrics))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -517,9 +584,9 @@ class GymTrackerApplicationTests {
         bodyMetrics.setMuscleMass(-30.0);
         bodyMetrics.setFatPercentage(20.0);
 
-        mockMvc.perform(post("/api/body-metrics")
+        mockMvc.perform(withUserToken(post("/api/body-metrics")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(bodyMetrics)))
+                        .content(objectMapper.writeValueAsString(bodyMetrics))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -530,9 +597,9 @@ class GymTrackerApplicationTests {
         bodyMetrics.setMuscleMass(30.0);
         bodyMetrics.setFatPercentage(-20.0);
 
-        mockMvc.perform(post("/api/body-metrics")
+        mockMvc.perform(withUserToken(post("/api/body-metrics")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(bodyMetrics)))
+                        .content(objectMapper.writeValueAsString(bodyMetrics))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -543,9 +610,9 @@ class GymTrackerApplicationTests {
         crowdLog.setTimeSlot("10:00 AM");
         crowdLog.setCrowdLevel(-1);
 
-        mockMvc.perform(post("/api/crowd/report")
+        mockMvc.perform(withUserToken(post("/api/crowd/report")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(crowdLog)))
+                        .content(objectMapper.writeValueAsString(crowdLog))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -556,9 +623,9 @@ class GymTrackerApplicationTests {
         crowdLog.setTimeSlot("10:00 AM");
         crowdLog.setCrowdLevel(101);
 
-        mockMvc.perform(post("/api/crowd/report")
+        mockMvc.perform(withUserToken(post("/api/crowd/report")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(crowdLog)))
+                        .content(objectMapper.writeValueAsString(crowdLog))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -569,9 +636,9 @@ class GymTrackerApplicationTests {
         workoutLog.setReps(10);
         workoutLog.setSets(3);
 
-        mockMvc.perform(post("/api/workouts/log")
+        mockMvc.perform(withUserToken(post("/api/workouts/log")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(workoutLog)))
+                        .content(objectMapper.writeValueAsString(workoutLog))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -582,9 +649,9 @@ class GymTrackerApplicationTests {
         workoutLog.setReps(0);
         workoutLog.setSets(3);
 
-        mockMvc.perform(post("/api/workouts/log")
+        mockMvc.perform(withUserToken(post("/api/workouts/log")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(workoutLog)))
+                        .content(objectMapper.writeValueAsString(workoutLog))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -595,9 +662,9 @@ class GymTrackerApplicationTests {
         workoutLog.setReps(10);
         workoutLog.setSets(0);
 
-        mockMvc.perform(post("/api/workouts/log")
+        mockMvc.perform(withUserToken(post("/api/workouts/log")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(workoutLog)))
+                        .content(objectMapper.writeValueAsString(workoutLog))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -608,11 +675,11 @@ class GymTrackerApplicationTests {
         exercise.setName("Test delete exercise");
         exercise.setMuscleGroup("Chest");
 
-        MvcResult exerciseResult = mockMvc.perform(
+        MvcResult exerciseResult = mockMvc.perform(withUserToken(
                 post("/api/exercises")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(exercise))
-        ).andExpect(status().isOk()).andReturn();
+        )).andExpect(status().isOk()).andReturn();
 
         Exercise createdExercise = objectMapper.readValue(
                 exerciseResult.getResponse().getContentAsString(),
@@ -626,11 +693,11 @@ class GymTrackerApplicationTests {
         workoutLog.setReps(10);
         workoutLog.setSets(3);
 
-        MvcResult workoutResult = mockMvc.perform(
+        MvcResult workoutResult = mockMvc.perform(withUserToken(
                 post("/api/workouts/log")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(workoutLog))
-        ).andExpect(status().isOk()).andReturn();
+        )).andExpect(status().isOk()).andReturn();
 
         WorkoutLog createdWorkoutLog = objectMapper.readValue(
                 workoutResult.getResponse().getContentAsString(),
@@ -638,13 +705,13 @@ class GymTrackerApplicationTests {
         );
 
         // Delete the exercise
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                 delete("/api/exercises/" + createdExercise.getId())
-        ).andExpect(status().isOk());
+        )).andExpect(status().isOk());
 
         // Verify the workout log was also deleted
-        mockMvc.perform(
+        mockMvc.perform(withUserToken(
                 delete("/api/workouts/log/" + createdWorkoutLog.getId())
-        ).andExpect(status().isNotFound());
+        )).andExpect(status().isNotFound());
     }
 }

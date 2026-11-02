@@ -17,6 +17,9 @@ import io.swagger.v3.oas.annotations.Operation;
 
 import java.util.List;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+
 @Tag(
         name = "Gym Tracker API",
         description = "APIs for workout tracking, body metrics, exercises, and gym crowd analytics"
@@ -51,33 +54,33 @@ public class GymTrackerController {
 
     @Operation(
             summary = "Create body metrics",
-            description = "Records the user's weight, muscle mass, and body fat percentage."
+            description = "Records body metrics for the authenticated user."
     )
     @PostMapping("/body-metrics")
     public BodyMetrics logBodyMetrics(
-            @Valid@RequestBody BodyMetrics metrics
+            @Valid @RequestBody BodyMetrics metrics,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        return bodyMetricsService.logBodyMetrics(metrics);
+        return bodyMetricsService.logBodyMetrics(
+                metrics, authenticatedUserId(jwt));
     }
 
-    @Operation(
-            summary = "Get body metrics history",
-            description = "Returns the user's previously recorded body metrics."
-    )
     @GetMapping("/body-metrics/history")
-    public List<BodyMetrics> getBodyMetricsHistory() {
-        return bodyMetricsService.getBodyMetricsHistory();
+    public List<BodyMetrics> getBodyMetricsHistory(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return bodyMetricsService.getBodyMetricsHistory(
+                authenticatedUserId(jwt));
     }
 
-    @Operation(
-            summary = "Delete body metrics",
-            description = "Deletes a body metrics record by its ID."
-    )
     @DeleteMapping("/body-metrics/{id}")
     public String deleteBodyMetrics(
-            @PathVariable Long id
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        bodyMetricsService.deleteBodyMetrics(id);
+        bodyMetricsService.deleteBodyMetrics(
+                id, authenticatedUserId(jwt));
+
         return "Body metric entry with ID " + id
                 + " was successfully deleted.";
     }
@@ -85,12 +88,11 @@ public class GymTrackerController {
     @PutMapping("/body-metrics/{id}")
     public BodyMetrics updateBodyMetrics(
             @PathVariable Long id,
-            @Valid@RequestBody BodyMetrics updatedMetrics
+            @Valid @RequestBody BodyMetrics updatedMetrics,
+            @AuthenticationPrincipal Jwt jwt
     ) {
         return bodyMetricsService.updateBodyMetrics(
-                id,
-                updatedMetrics
-        );
+                id, updatedMetrics, authenticatedUserId(jwt));
     }
 
 
@@ -128,7 +130,7 @@ public class GymTrackerController {
     ) {
         exerciseService.deleteExercise(id);
         return "Exercise with ID " + id
-                + " and all its related logs deleted successfully.";
+                + " deleted";
     }
 
 
@@ -138,52 +140,46 @@ public class GymTrackerController {
 
     @Operation(
             summary = "Log a workout",
-            description = "Records a workout for an exercise, including weight lifted, repetitions, and sets."
+            description = "Records a workout for the authenticated user."
     )
     @PostMapping("/workouts/log")
     public WorkoutLog logWorkout(
-            @Valid@RequestBody WorkoutLog log
+            @Valid @RequestBody WorkoutLog log,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        return workoutLogService.logWorkout(log);
+        return workoutLogService.logWorkout(
+                log, authenticatedUserId(jwt));
     }
 
-    @Operation(
-            summary = "Get workout progress",
-            description = "Returns the workout progress history for a specific exercise."
-    )
     @GetMapping("/workouts/progress/{exerciseId}")
     public List<WorkoutLog> getExerciseProgress(
-            @PathVariable Long exerciseId
+            @PathVariable Long exerciseId,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        return workoutLogService.getExerciseProgress(exerciseId);
+        return workoutLogService.getExerciseProgress(
+                exerciseId, authenticatedUserId(jwt));
     }
 
-    @Operation(
-            summary = "Delete workout log",
-            description = "Deletes a workout log by its ID."
-    )
     @DeleteMapping("/workouts/log/{id}")
     public String deleteWorkoutLog(
-            @PathVariable Long id
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        workoutLogService.deleteWorkoutLog(id);
+        workoutLogService.deleteWorkoutLog(
+                id, authenticatedUserId(jwt));
+
         return "Workout log with ID " + id
                 + " was successfully deleted.";
     }
 
-    @Operation(
-            summary = "Update workout log",
-            description = "Updates an existing workout log by its ID."
-    )
     @PutMapping("/workouts/log/{id}")
     public WorkoutLog updateWorkoutLog(
             @PathVariable Long id,
-            @Valid@RequestBody WorkoutLog updatedLog
+            @Valid @RequestBody WorkoutLog updatedLog,
+            @AuthenticationPrincipal Jwt jwt
     ) {
         return workoutLogService.updateWorkoutLog(
-                id,
-                updatedLog
-        );
+                id, updatedLog, authenticatedUserId(jwt));
     }
 
 
@@ -255,5 +251,16 @@ public class GymTrackerController {
             @PathVariable String day
     ) {
         return crowdLogService.getOptimalTimeSlots(day);
+    }
+
+    private Long authenticatedUserId(Jwt jwt) {
+        Number userId = jwt.getClaim("uid");
+
+        if (userId == null) {
+            throw new IllegalStateException(
+                    "Authenticated JWT is missing the uid claim.");
+        }
+
+        return userId.longValue();
     }
 }

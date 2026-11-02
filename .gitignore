@@ -39,3 +39,6 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+
+# Local H2 database files
+/data/

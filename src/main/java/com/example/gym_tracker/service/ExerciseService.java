@@ -27,15 +27,17 @@ public class ExerciseService {
         return exerciseRepository.findAll();
     }
 
+
     @Transactional
     public void deleteExercise(Long id) {
-        exerciseRepository.findById(id)
+        Exercise exercise = exerciseRepository.findById(id)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Exercise not found with ID " + id
                         ));
 
         workoutLogRepository.deleteByExerciseId(id);
-        exerciseRepository.deleteById(id);
+        exerciseRepository.delete(exercise);
     }
+
 }

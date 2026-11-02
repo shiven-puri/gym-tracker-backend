@@ -102,9 +102,54 @@
 </head>
 <body>
 
+<div class="card" id="authCard" style="width: 100%; max-width: 400px; margin-bottom: 20px; box-sizing: border-box;">
+    <h2 id="authTitle">Login</h2>
+
+    <form id="authForm">
+        <input
+                type="email"
+                id="authEmail"
+                placeholder="Email address"
+                autocomplete="email"
+                required
+        >
+
+        <input
+                type="password"
+                id="authPassword"
+                placeholder="Password"
+                autocomplete="current-password"
+                required
+        >
+
+        <button type="submit" id="authSubmit">Login</button>
+    </form>
+
+    <p id="authMessage" role="status" aria-live="polite"></p>
+
+    <button type="button" id="authToggle" style="background: transparent; color: var(--accent);">
+        Don't have an account? Register
+    </button>
+</div>
+
+<div id="dashboard" style="display: none; width: 100%;">
+
 <h1>🏋️ Gym Tracker Dashboard </h1>
 
-<div class="container">
+
+    <div style="width: 100%; max-width: 1250px; display: flex; justify-content: flex-end; margin-bottom: 16px;">
+        <span id="loggedInUser" style="color: var(--text-dim); margin-right: 12px; align-self: center;"></span>
+        <button type="button" id="logoutButton" class="btn-danger">
+            Logout
+        </button>
+    </div>
+
+
+
+
+
+
+    <div class="container">
 
     <!-- ==========================================
          1. BODY METRICS CARD
@@ -201,17 +246,179 @@
         </div>
         <div id="crowdList" class="data-list">Select day and click GET...</div>
     </div>
+    </div>
 
 </div>
 
 <script>
     const API_BASE = "/api";
 
+    let authToken = null;
+    let currentUser = null;
+
+
+
+    async function apiFetch(path, options = {}) {
+        const headers = {
+            ...options.headers
+        };
+
+        if (authToken) {
+            headers["Authorization"] = `Bearer ${authToken}`;
+        }
+
+        const response = await fetch(`${API_BASE}${path}`, {
+            ...options,
+            headers
+        });
+
+        if (response.status === 401) {
+            // Clear the expired or invalid session.
+            sessionStorage.removeItem("authToken");
+            sessionStorage.removeItem("currentUser");
+
+            authToken = null;
+            currentUser = null;
+
+            // Return to the login screen.
+            document.getElementById("dashboard").style.display = "none";
+            document.getElementById("authCard").style.display = "flex";
+
+            // Reset the form to Login mode.
+            isRegisterMode = false;
+            document.getElementById("authTitle").textContent = "Login";
+            document.getElementById("authSubmit").textContent = "Login";
+            document.getElementById("authToggle").textContent =
+                "Don't have an account? Register";
+            document.getElementById("authPassword").setAttribute(
+                "autocomplete",
+                "current-password"
+            );
+
+            document.getElementById("authMessage").textContent =
+                "Your session has expired. Please log in again.";
+
+            document.getElementById("loggedInUser").textContent = "";
+        }
+
+        return response;
+    }
+
+
+
+    let isRegisterMode = false;
+
+    document.getElementById("authToggle").addEventListener("click", () => {
+        isRegisterMode = !isRegisterMode;
+
+        document.getElementById("authTitle").textContent =
+            isRegisterMode ? "Register" : "Login";
+
+        document.getElementById("authSubmit").textContent =
+            isRegisterMode ? "Create Account" : "Login";
+
+        document.getElementById("authToggle").textContent =
+            isRegisterMode
+                ? "Already have an account? Login"
+                : "Don't have an account? Register";
+
+        document.getElementById("authPassword").setAttribute(
+            "autocomplete",
+            isRegisterMode ? "new-password" : "current-password"
+        );
+
+        document.getElementById("authMessage").textContent = "";
+    });
+
+
+    document.getElementById("authForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const email = document.getElementById("authEmail").value.trim();
+        const password = document.getElementById("authPassword").value;
+        const message = document.getElementById("authMessage");
+        const submitButton = document.getElementById("authSubmit");
+
+        message.textContent = "Please wait...";
+        submitButton.disabled = true;
+
+        try {
+            const response = await fetch(
+                `${API_BASE}/auth/${isRegisterMode ? "register" : "login"}`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ email, password })
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || "Authentication failed.");
+            }
+
+            authToken = result.token;
+            currentUser = {
+                userId: result.userId,
+                email: result.email
+            };
+
+            sessionStorage.setItem("authToken", authToken);
+            sessionStorage.setItem("currentUser", JSON.stringify(currentUser));
+            document.getElementById("loggedInUser").textContent = result.email;
+
+            document.getElementById("authCard").style.display = "none";
+            document.getElementById("dashboard").style.display = "block";
+
+            await loadExerciseDropdowns();
+            await loadBodyMetrics();
+            await loadWorkoutHistory();
+
+
+
+        } catch (error) {
+            message.textContent = error.message;
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+
+
+    document.getElementById("logoutButton").addEventListener("click", () => {
+        sessionStorage.removeItem("authToken");
+        sessionStorage.removeItem("currentUser");
+        authToken = null;
+        currentUser = null;
+
+        document.getElementById("dashboard").style.display = "none";
+        document.getElementById("authCard").style.display = "flex";
+        document.getElementById("authForm").reset();
+        document.getElementById("authMessage").textContent = "";
+        document.getElementById("loggedInUser").textContent = "";
+
+        // Return the form to Login mode.
+        isRegisterMode = false;
+        document.getElementById("authTitle").textContent = "Login";
+        document.getElementById("authSubmit").textContent = "Login";
+        document.getElementById("authToggle").textContent =
+            "Don't have an account? Register";
+        document.getElementById("authPassword").setAttribute(
+            "autocomplete",
+            "current-password"
+        );
+    });
+
+
+
+
     // ==========================================
     // 1. BODY METRICS CRUD
     // ==========================================
     async function loadBodyMetrics() {
-        const res = await fetch(`${API_BASE}/body-metrics/history`);
+        const res = await apiFetch("/body-metrics/history");
         const data = await res.json();
         const list = document.getElementById('bodyList');
         list.innerHTML = data.reverse().map(item => `
@@ -235,7 +442,7 @@
             muscleMass: parseFloat(document.getElementById('muscleMass').value),
             fatPercentage: parseFloat(document.getElementById('fatPercentage').value)
         };
-        await fetch(`${API_BASE}/body-metrics`, {
+        await apiFetch("/body-metrics", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -247,7 +454,7 @@
     async function updateBodyMetrics(id) {
         const newWeight = prompt("Enter new weight in kg:");
         if (!newWeight) return;
-        await fetch(`${API_BASE}/body-metrics/${id}`, {
+        await apiFetch(`/body-metrics/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ weight: parseFloat(newWeight) })
@@ -257,7 +464,7 @@
 
     async function deleteBodyMetrics(id) {
         if (!confirm(`Delete Body Metric #${id}?`)) return;
-        await fetch(`${API_BASE}/body-metrics/${id}`, { method: 'DELETE' });
+        await apiFetch(`/body-metrics/${id}`, { method: 'DELETE' });
         loadBodyMetrics();
     }
 
@@ -266,7 +473,7 @@
     // ==========================================
     async function loadExerciseDropdowns() {
         try {
-            const res = await fetch(`${API_BASE}/exercises`);
+            const res = await apiFetch(`/exercises`);
             const exercises = await res.json();
 
             const exSelect = document.getElementById('exIdSelect');
@@ -300,7 +507,7 @@
             name: document.getElementById('exName').value,
             muscleGroup: document.getElementById('exGroup').value
         };
-        const res = await fetch(`${API_BASE}/exercises`, {
+        const res = await apiFetch(`/exercises`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -317,7 +524,7 @@
         const id = selectEl ? selectEl.value : null;
         if (!id) return;
         if (!confirm(`Delete Exercise ID #${id} and associated logs?`)) return;
-        const res = await fetch(`${API_BASE}/exercises/${id}`, { method: 'DELETE' });
+        const res = await apiFetch(`/exercises/${id}`, { method: 'DELETE' });
         const text = await res.text();
         alert(text);
         loadExerciseDropdowns(); // Refreshes dropdowns immediately!
@@ -334,7 +541,7 @@
             reps: parseInt(document.getElementById('reps').value),
             sets: parseInt(document.getElementById('sets').value)
         };
-        await fetch(`${API_BASE}/workouts/log`, {
+        await apiFetch(`/workouts/log`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -347,7 +554,7 @@
     async function loadWorkoutHistory() {
         const id = document.getElementById('searchExIdSelect').value;
         if (!id) return;
-        const res = await fetch(`${API_BASE}/workouts/progress/${id}`);
+        const res = await apiFetch(`/workouts/progress/${id}`);
         const data = await res.json();
         const list = document.getElementById('workoutList');
         if (data.length === 0) {
@@ -373,7 +580,7 @@
         if (!newWeight) return;
 
         try {
-            const res = await fetch(`${API_BASE}/workouts/log/${id}`, {
+            const res = await apiFetch(`/workouts/log/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ weightLifted: parseFloat(newWeight) })
@@ -395,7 +602,7 @@
         if (!confirm(`Are you sure you want to delete Workout Log #${id}?`)) return;
 
         try {
-            const res = await fetch(`${API_BASE}/workouts/log/${id}`, {
+            const res = await apiFetch(`/workouts/log/${id}`, {
                 method: 'DELETE'
             });
 
@@ -420,7 +627,7 @@
             timeSlot: document.getElementById('timeSlot').value,
             crowdLevel: parseInt(document.getElementById('crowdLevel').value)
         };
-        await fetch(`${API_BASE}/crowd/report`, {
+        await apiFetch(`/crowd/report`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -431,7 +638,7 @@
 
     async function loadCrowdStats() {
         const day = document.getElementById('searchDay').value;
-        const res = await fetch(`${API_BASE}/crowd/stats/${day}`);
+        const res = await apiFetch(`/crowd/stats/${day}`);
         const data = await res.json();
         const list = document.getElementById('crowdList');
         if (data.length === 0) {
@@ -455,7 +662,7 @@
     async function updateCrowdReport(id) {
         const newLevel = prompt("Enter updated traffic level (1-5):");
         if (!newLevel) return;
-        await fetch(`${API_BASE}/crowd/report/${id}`, {
+        await apiFetch(`/crowd/report/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ crowdLevel: parseInt(newLevel) })
@@ -465,13 +672,13 @@
 
     async function deleteCrowdReport(id) {
         if (!confirm(`Delete Crowd Log #${id}?`)) return;
-        await fetch(`${API_BASE}/crowd/report/${id}`, { method: 'DELETE' });
+        await apiFetch(`/crowd/report/${id}`, { method: 'DELETE' });
         loadCrowdStats();
     }
 
     async function getOptimalSlots() {
         const day = document.getElementById('searchDay').value;
-        const res = await fetch(`${API_BASE}/analytics/optimal-slots/${day}`);
+        const res = await apiFetch(`/analytics/optimal-slots/${day}`);
         const data = await res.json();
         const list = document.getElementById('crowdList');
         if (data.length === 0) {
@@ -487,11 +694,48 @@
     }
 
 
-    // Call this on page startup
-    loadExerciseDropdowns();
+    (async function restoreSession() {
+        const savedToken = sessionStorage.getItem("authToken");
+        const savedUser = sessionStorage.getItem("currentUser");
 
-    // Initial Load
-    loadBodyMetrics();
+        // No saved session: leave the login page visible.
+        if (!savedToken || !savedUser) {
+            return;
+        }
+
+        try {
+            authToken = savedToken;
+            currentUser = JSON.parse(savedUser);
+
+            if (!currentUser.email || currentUser.userId == null) {
+                throw new Error("Invalid saved session");
+            }
+
+            document.getElementById("loggedInUser").textContent =
+                currentUser.email;
+
+            document.getElementById("authCard").style.display = "none";
+            document.getElementById("dashboard").style.display = "block";
+
+            // Reload the dashboard data using the restored token.
+            await loadExerciseDropdowns();
+            await loadBodyMetrics();
+            await loadWorkoutHistory();
+
+        } catch (error) {
+            // Discard a malformed saved session.
+            sessionStorage.removeItem("authToken");
+            sessionStorage.removeItem("currentUser");
+
+            authToken = null;
+            currentUser = null;
+
+            document.getElementById("dashboard").style.display = "none";
+            document.getElementById("authCard").style.display = "flex";
+        }
+    })();
+
+
 </script>
 </body>
 </html>
