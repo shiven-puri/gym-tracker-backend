@@ -1,35 +1,16 @@
 
-
 services:
-  # ==========================================
-  # SERVICE 1: ORACLE DATABASE CONTAINER
-  # ==========================================
-  oracle-db:
-    image: container-registry.oracle.com/database/free:latest
-    container_name: oracle-db
-    ports:
-      - "1522:1521"
-    environment:
-      - ORACLE_PWD=${ORACLE_PWD}
-    volumes:
-      - oracle-data:/opt/oracle/oradata
-    restart: always
-
-  # ==========================================
-  # SERVICE 2: SPRING BOOT APPLICATION CONTAINER
-  # ==========================================
   gym-tracker-app:
     build: .
     container_name: gym-tracker-app
     ports:
       - "8080:8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@//oracle-db:1521/FREEPDB1
-      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
-    depends_on:
-      - oracle-db
-    restart: always
+      SPRING_PROFILES_ACTIVE: local
+      JWT_SECRET: ${JWT_SECRET:?secret in env file}
+    volumes:
+      - gym-tracker-data:/app/data
+    restart: unless-stopped
+
 volumes:
-  oracle-data:
-    
+  gym-tracker-data:

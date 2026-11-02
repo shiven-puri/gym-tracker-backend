@@ -2,16 +2,23 @@
 
 A full-stack gym tracking application built with **Spring Boot** that allows users to manage exercises, log workouts, track body metrics, report gym crowd levels, and analyze crowd patterns to find optimal gym time slots.
 
-The application is containerized with Docker, tested through GitHub Actions, and deployed to **Azure Container Apps** with **Azure Database for PostgreSQL** for persistent production data.
+The application includes JWT-based authentication, user-specific data access, Docker containerization, GitHub Actions CI, and deployment to **Azure Container Apps** with **Azure Database for PostgreSQL** for persistent production data.
 
 ---
 
 ## ✨ Features
 
+- 🔐 **Authentication & Authorization**
+  - User registration and login
+  - JWT-based authentication
+  - Protected API endpoints
+  - User-specific access to personal workout and body metric data
+  - Role-based authorization for administrative crowd-report operations
+  - Session persistence across page refreshes
+  - Logout and invalid-session handling
+
 - 🏋️ **Exercise Management**
-  - Create exercises
-  - View all exercises
-  - Delete exercises
+  - Create, view, and delete exercises
   - Automatically delete associated workout logs when an exercise is deleted
 
 - 💪 **Workout Tracking**
@@ -21,16 +28,14 @@ The application is containerized with Docker, tested through GitHub Actions, and
   - Update and delete workout logs
 
 - 📏 **Body Metrics**
-  - Record weight
-  - Record muscle mass
-  - Record body fat percentage
+  - Record weight, muscle mass, and body fat percentage
   - View body metric history
   - Update and delete measurements
 
 - 👥 **Gym Crowd Tracking**
   - Report gym crowd levels
   - View crowd statistics by day
-  - Update and delete crowd reports
+  - Update and delete crowd reports, subject to authorization
 
 - 📊 **Crowd Analytics**
   - Analyze historical crowd data
@@ -40,7 +45,8 @@ The application is containerized with Docker, tested through GitHub Actions, and
   - Interactive Swagger / OpenAPI documentation
 
 - 🧪 **Automated Testing**
-  - 24 automated tests covering CRUD operations, validation, error handling, analytics, and entity relationships
+  - Automated tests for CRUD operations, validation, error handling, analytics, and entity relationships
+  - H2 database configuration for lightweight CI testing
 
 ---
 
@@ -48,15 +54,26 @@ The application is containerized with Docker, tested through GitHub Actions, and
 
 ### Backend
 
-- **Java 21**
-- **Spring Boot**
-- **Spring Web**
-- **Spring Data JPA**
-- **Hibernate**
-- **Jakarta Bean Validation**
-- **Maven**
-- **Lombok**
-- **Swagger / OpenAPI**
+- Java 21
+- Spring Boot
+- Spring Security
+- Spring Web
+- Spring Data JPA
+- Hibernate
+- Jakarta Bean Validation
+- Maven
+- Lombok
+- JWT authentication
+- Swagger / OpenAPI
+
+### Frontend
+
+- HTML
+- CSS
+- JavaScript
+- Fetch API
+
+The frontend is served as a static page by the Spring Boot application.
 
 ### Databases
 
@@ -66,16 +83,16 @@ The application is containerized with Docker, tested through GitHub Actions, and
 | Automated tests / CI | H2 |
 | Production | Azure Database for PostgreSQL |
 
-The application uses environment variables for database configuration, allowing the same application to run against different databases in different environments.
+Database configuration is supplied through environment variables, allowing the application to use different databases in different environments.
 
 ### DevOps & Cloud
 
-- **Docker**
-- **Docker Compose**
-- **GitHub Actions**
-- **GitHub Container Registry (GHCR)**
-- **Azure Container Apps**
-- **Azure Database for PostgreSQL**
+- Docker
+- Docker Compose
+- GitHub Actions
+- GitHub Container Registry (GHCR)
+- Azure Container Apps
+- Azure Database for PostgreSQL
 
 ---
 
@@ -107,13 +124,15 @@ The application follows a layered Spring Boot architecture:
                   └─────────┘
 ```
 
-- **Controller** — exposes REST API endpoints and handles HTTP requests
-- **Service** — contains application and business logic
-- **Repository** — handles database access through Spring Data JPA
-- **Model** — represents persisted application entities
-- **DTO** — used for specialized API responses such as crowd analytics
-- **Global Exception Handler** — provides consistent error responses for validation failures and missing resources
-- **Static Frontend** — provides the web UI served by Spring Boot
+- **Controller** — exposes REST API endpoints and handles HTTP requests.
+- **Service** — contains application and business logic.
+- **Repository** — handles database access through Spring Data JPA.
+- **Model** — represents persisted application entities.
+- **DTO** — provides specialized request and response structures.
+- **Security configuration** — defines public endpoints, authentication requirements, and authorization rules.
+- **JWT components** — issue and validate authentication tokens.
+- **Global exception handler** — provides consistent error responses for supported exceptions.
+- **Static frontend** — provides the web interface served by Spring Boot.
 
 ---
 
@@ -121,15 +140,13 @@ The application follows a layered Spring Boot architecture:
 
 ## Prerequisites
 
-For local development, install:
+Install the following for local development:
 
 - Java 21
 - Docker Desktop
 - Git
 
 The project includes the Maven Wrapper, so Maven does not need to be installed separately.
-
----
 
 ## 1. Clone the repository
 
@@ -138,33 +155,31 @@ git clone https://github.com/shiven-puri/gym-tracker-backend.git
 cd gym-tracker-backend
 ```
 
----
-
 ## 2. Configure environment variables
 
-Create a `.env` file based on the provided example:
+Create a `.env` file using the example configuration.
 
-```bash
+**Windows:**
+
+```powershell
 copy .env.example .env
 ```
 
-On Linux/macOS:
+**Linux/macOS:**
 
 ```bash
 cp .env.example .env
 ```
 
-Configure the required database credentials in `.env`.
+Configure the required database credentials and other required environment variables in `.env`.
 
-> `.env` is intentionally excluded from version control. Never commit database passwords or other secrets.
+> Never commit database passwords, JWT signing secrets, or other sensitive credentials to Git.
 
 ---
 
 # 🐳 Running with Docker
 
-The project includes a `docker-compose.yml` configuration for local development.
-
-The local Docker setup uses **Oracle Database** as the application database.
+The project includes a `docker-compose.yml` configuration for local development using Oracle Database.
 
 Start the application and database:
 
@@ -184,7 +199,7 @@ View application logs:
 docker compose logs gym-tracker-app
 ```
 
-Follow the logs:
+Follow the application logs:
 
 ```bash
 docker compose logs -f gym-tracker-app
@@ -196,117 +211,92 @@ Stop the containers:
 docker compose down
 ```
 
-The Oracle database uses a persistent Docker volume so that application data is retained when the containers are stopped or recreated.
+The Oracle database uses a persistent Docker volume so database data can survive container stops and recreation.
+
+**Note:** `docker compose down` does not normally delete named volumes. Avoid using `docker compose down -v` unless you intentionally want to remove the associated volumes and their stored data.
 
 ---
 
 # 💻 Running Without Docker
 
-The application can also be run directly with Spring Boot if an appropriate database is available.
+The application can be run directly with Spring Boot if a compatible database is available and the required environment variables are configured.
+
+**Linux/macOS:**
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Windows:
+**Windows:**
 
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
-The application runs on:
+The application runs at:
 
 ```text
 http://localhost:8080
 ```
 
----
-
-# 🧪 Testing
-
-The project uses **H2** for automated tests so that CI does not need to start the heavier Oracle database container.
-
-The test suite currently contains **24 automated tests** covering:
-
-- CRUD operations
-- Bean validation
-- Error handling
-- Missing-resource scenarios
-- Workout progress
-- Crowd analytics
-- Exercise and workout-log relationships
-
-Run the test suite:
-
-```bash
-./mvnw clean verify
-```
-
-Windows:
-
-```powershell
-.\mvnw.cmd clean verify
-```
-
-GitHub Actions automatically runs the build and test suite on pushes and pull requests targeting `main`.
+Open the root URL or `/index.html` to access the Gym Tracker interface.
 
 ---
 
-# 🐳 Docker Image
+# 🔐 Authentication & Authorization
 
-The application uses a **multi-stage Docker build**.
+The application uses JSON Web Tokens (JWTs) to authenticate users accessing protected API endpoints.
 
-### Build stage
+## Authentication endpoints
 
-Uses:
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/auth/register` | Register a new account |
+| POST | `/api/auth/login` | Authenticate an existing user |
 
-```text
-eclipse-temurin:21-jdk-alpine
+Registration and login accept JSON containing the user's email and password.
+
+Example request:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "your-password"
+}
 ```
 
-to compile the Spring Boot application.
+On successful authentication, the backend returns a response containing the JWT, token type, user ID, and email.
 
-### Runtime stage
+The frontend stores the token and attaches it to protected API requests using the `Authorization` header:
 
-Uses:
-
-```text
-eclipse-temurin:21-jre-alpine
+```http
+Authorization: Bearer <JWT>
 ```
 
-to run the compiled JAR with a smaller runtime image.
+## Session management
 
-The runtime container runs the application as a non-root user.
+The frontend implements the following session behavior:
 
-Build the image manually:
+- The user must log in before accessing the dashboard.
+- The JWT and current-user information are stored in `sessionStorage`.
+- The session is restored when the page is refreshed in the same tab.
+- Logging out clears the stored session and returns the user to the login page.
+- An HTTP `401 Unauthorized` response from requests using the shared API wrapper clears the session and prompts the user to log in again.
+- The JWT is configured to expire after one hour.
 
-```bash
-docker build -t gym-tracker-backend .
-```
+The browser-side session restoration does not itself validate the JWT. The backend remains responsible for validating the token and enforcing access controls on protected endpoints.
 
-Run it:
+## Authorization
 
-```bash
-docker run -p 8080:8080 gym-tracker-backend
-```
+The API distinguishes between public operations, authenticated operations, and administrative operations.
 
----
+- Authentication endpoints are public.
+- Exercise retrieval and selected crowd analytics endpoints are public.
+- Personal body metric and workout operations require authentication and are subject to user-ownership checks.
+- Creating crowd reports requires authentication.
+- Updating and deleting crowd reports are restricted to authorized administrative users.
 
-# 📖 API Documentation
-
-Swagger / OpenAPI documentation is available when the application is running.
-
-### Swagger UI
-
-```text
-http://localhost:8080/swagger-ui.html
-```
-
-### OpenAPI specification
-
-```text
-http://localhost:8080/api-docs
-```
+The backend enforces authorization; hiding or showing frontend controls is not a substitute for server-side access checks.
 
 ---
 
@@ -319,61 +309,189 @@ All REST endpoints use the `/api` base path.
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/api/body-metrics` | Record body metrics |
-| GET | `/api/body-metrics/history` | Get body metric history |
+| GET | `/api/body-metrics/history` | Retrieve body metric history |
 | PUT | `/api/body-metrics/{id}` | Update body metrics |
 | DELETE | `/api/body-metrics/{id}` | Delete body metrics |
 
----
+These endpoints require authentication and enforce user-specific access.
 
 ## Exercises
 
 | Method | Endpoint | Description |
 |---|---|---|
+| GET | `/api/exercises` | Retrieve exercises |
 | POST | `/api/exercises` | Create an exercise |
-| GET | `/api/exercises` | Get all exercises |
 | DELETE | `/api/exercises/{id}` | Delete an exercise and its associated workout logs |
 
----
+Exercise retrieval is public. Write operations are subject to the backend's security configuration.
 
 ## Workout Logs
 
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/api/workouts/log` | Record a workout |
-| GET | `/api/workouts/progress/{exerciseId}` | Get progress for an exercise |
+| GET | `/api/workouts/progress/{exerciseId}` | Retrieve progress for an exercise |
 | PUT | `/api/workouts/log/{id}` | Update a workout log |
 | DELETE | `/api/workouts/log/{id}` | Delete a workout log |
 
----
+Workout operations require authentication and enforce ownership restrictions.
 
 ## Crowd Tracking
 
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/api/crowd/report` | Report gym crowd level |
-| GET | `/api/crowd/stats/{day}` | Get crowd statistics for a day |
+| GET | `/api/crowd/stats/{day}` | Retrieve crowd statistics |
 | PUT | `/api/crowd/report/{id}` | Update a crowd report |
 | DELETE | `/api/crowd/report/{id}` | Delete a crowd report |
 
----
+Write operations are subject to authentication and authorization rules. Updating and deleting crowd reports require the appropriate administrative role.
 
 ## Crowd Analytics
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/analytics/optimal-slots/{day}` | Get optimal gym time slots for a day |
+| GET | `/api/analytics/optimal-slots/{day}` | Retrieve optimal gym time slots |
+
+## API Documentation
+
+When the application is running, access Swagger UI at:
+
+```text
+http://localhost:8080/swagger-ui.html
+```
+
+OpenAPI specification:
+
+```text
+http://localhost:8080/api-docs
+```
+
+---
+
+# 🧪 Testing
+
+The project includes automated tests for CRUD operations, validation, error handling, workout progress, crowd analytics, and entity relationships. H2 is used for automated tests so CI does not need to start an Oracle database container.
+
+Run the test suite:
+
+**Linux/macOS:**
+
+```bash
+./mvnw clean verify
+```
+
+**Windows:**
+
+```powershell
+.\mvnw.cmd clean verify
+```
+
+The existing test suite was originally developed around the application's earlier, unauthenticated API behavior. Authentication and authorization changes may require updating integration tests to provide valid JWTs and test unauthorized access, forbidden operations, and user-ownership boundaries.
+
+Run the suite and review the results before treating the current code as fully tested. Do not assume all tests pass solely because the application starts successfully.
+
+GitHub Actions is configured to run the build and tests on pushes and pull requests targeting `main`.
+
+---
+
+# 🐳 Docker Image
+
+The application uses a multi-stage Docker build.
+
+### Build stage
+
+```text
+eclipse-temurin:21-jdk-alpine
+```
+
+This stage compiles the Spring Boot application.
+
+### Runtime stage
+
+```text
+eclipse-temurin:21-jre-alpine
+```
+
+This stage runs the compiled JAR with a smaller Java runtime image.
+
+The runtime container runs the application as a non-root user.
+
+Build the image manually:
+
+```bash
+docker build -t gym-tracker-backend .
+```
+
+Run the image:
+
+```bash
+docker run -p 8080:8080 gym-tracker-backend
+```
+
+For a complete local environment, use Docker Compose so the application can connect to its configured database.
+
+Ensure required environment variables are supplied when running the image directly.
+
+---
+
+# 🔐 Configuration & Security
+
+Database configuration is supplied through environment variables:
+
+```properties
+spring.datasource.url=${DB_URL}
+spring.datasource.username=${DB_USERNAME}
+spring.datasource.password=${DB_PASSWORD}
+```
+
+The `.env.example` file provides a template for local configuration. The actual `.env` file should be excluded from version control.
+
+Never commit database credentials, production secrets, or JWT signing keys to the repository. Use environment variables or an appropriate secret-management system.
+
+## JWT storage decision
+
+The frontend currently stores its JWT and user information in browser `sessionStorage`.
+
+This choice was made for the current learning and demonstration project because it is straightforward to implement, allows the session to survive page refreshes, and normally limits persistence to the current browser tab's session.
+
+However, `sessionStorage` is accessible to JavaScript running on the page. If an attacker exploits a cross-site scripting (XSS) vulnerability, malicious JavaScript may be able to read the stored JWT and potentially use it to impersonate the user until the token expires.
+
+For this reason, this implementation should **not be considered the strongest production-ready session design**.
+
+### Why not use an HttpOnly, Secure cookie yet?
+
+A stronger production approach would be to place the session credential in a cookie configured with appropriate attributes, including:
+
+- `HttpOnly` — prevents client-side JavaScript from directly reading the cookie.
+- `Secure` — restricts cookie transmission to HTTPS.
+- `SameSite` — helps reduce cross-site request risks when configured appropriately.
+
+This requires coordinated backend and frontend changes, including cookie issuance, cookie handling, logout behavior, and appropriate CSRF protections where applicable.
+
+We are deferring that additional implementation complexity for now so that the current project can focus on completing and demonstrating the JWT authentication flow. The trade-off is documented intentionally and should be revisited before production use.
+
+**Important:** An `HttpOnly` cookie reduces the risk of token theft through JavaScript, but it does not eliminate XSS or every session-related risk. Production deployments still need appropriate input handling, output encoding, HTTPS, cookie configuration, CSRF defenses where applicable, and other security controls.
+
+### Logout and token expiration
+
+Logging out currently removes the token from the browser's `sessionStorage`. It does not revoke the JWT on the server.
+
+A copied or stolen token may therefore remain usable until it expires, unless another server-side control rejects it. The configured token lifetime is one hour.
+
+A production implementation may require additional measures, such as token revocation or refresh-token rotation, depending on its session requirements.
 
 ---
 
 # ☁️ Cloud Deployment
 
-The production application is deployed using:
+The production deployment uses:
 
 - **Azure Container Apps** — application hosting
 - **Azure Database for PostgreSQL** — persistent database
 - **GitHub Container Registry** — Docker image registry
 
-The production database is configured separately from the local Oracle database using environment variables:
+Production database configuration is supplied separately from the local Oracle configuration through:
 
 ```text
 DB_URL
@@ -383,7 +501,7 @@ DB_PASSWORD
 
 Sensitive credentials are stored using Azure Container Apps secrets rather than being committed to the repository.
 
-The Container App is configured with:
+The documented Container App configuration is:
 
 ```text
 CPU:              0.25 vCPU
@@ -392,7 +510,7 @@ Minimum replicas: 0
 Maximum replicas: 1
 ```
 
-The application can scale down when it is not being used while remaining available through its public HTTPS endpoint.
+The application can scale down when it is not being used while remaining available through its public HTTPS endpoint, subject to the configured scaling and availability behavior.
 
 ---
 
@@ -400,7 +518,7 @@ The application can scale down when it is not being used while remaining availab
 
 GitHub Actions is used for continuous integration and Docker image publishing.
 
-On every push or pull request to `main`:
+The workflow is configured to run on pushes and pull requests targeting `main`:
 
 ```text
 GitHub Push / Pull Request
@@ -421,46 +539,16 @@ GitHub Push / Pull Request
    GitHub Container Registry
 ```
 
-For pushes to `main`, Docker images are tagged with both:
+For pushes to `main`, Docker images are tagged with:
 
 ```text
 latest
 <git-commit-sha>
 ```
 
-The commit SHA tag provides an immutable reference to a specific build and can be used for reproducible deployments and rollbacks.
+The commit SHA tag provides a specific reference to a build and can support reproducible deployments and rollbacks.
 
-> Azure Container Apps deployment is currently performed separately from the GitHub Actions image publishing workflow.
-
----
-
-# 🔐 Configuration & Security
-
-Database configuration is supplied through environment variables:
-
-```properties
-spring.datasource.url=${DB_URL}
-spring.datasource.username=${DB_USERNAME}
-spring.datasource.password=${DB_PASSWORD}
-```
-
-Secrets should never be committed to Git.
-
-The repository includes:
-
-```text
-.env.example
-```
-
-as a template for required environment variables.
-
-The actual:
-
-```text
-.env
-```
-
-file is excluded from version control.
+Azure Container Apps deployment is performed separately from the GitHub Actions image-publishing workflow.
 
 ---
 
@@ -473,9 +561,6 @@ Local Development
        │
        ▼
 Oracle Database
-       │
-       ▼
-Spring Boot Application
 
 
 CI / Automated Tests
@@ -498,11 +583,12 @@ Production data is stored in Azure PostgreSQL and persists independently of Cont
 
 # 🔮 Future Enhancements
 
-Potential future improvements include:
+Potential improvements include:
 
-- JWT-based authentication
-- User accounts
-- Role-based authorization
+- Updating integration tests for JWT authentication and authorization
+- More comprehensive authentication and session-security testing
+- Migrating to an `HttpOnly`, `Secure` cookie-based session design for production
+- Refresh-token rotation or other session-lifecycle improvements, if required
 - Pagination and filtering
 - Automated deployment from GitHub Actions to Azure
 - Improved analytics and visualizations
